@@ -5,7 +5,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 #Install packages
 RUN apt upgrade -y
-RUN apt update && apt install -y sudo wget gnupg2 git gcc gfortran libboost-dev bzip2 openmpi-bin flex build-essential bison libboost-all-dev vim libsqlite3-dev numactl sqlite3 gdb libgtest-dev libssl-dev
+RUN apt update && apt install -y sudo wget gnupg2 git gcc libboost-dev bzip2 openmpi-bin flex build-essential bison libboost-all-dev vim libsqlite3-dev numactl sqlite3 gdb libgtest-dev libssl-dev
 
 WORKDIR /root
 RUN mkdir -p ~/miniconda3
@@ -14,11 +14,11 @@ RUN bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
 RUN rm ~/miniconda3/miniconda.sh
 
 ENV PATH="/root/miniconda3/bin:$PATH"
-RUN conda create --name faiss_build python=3.11 -y
+RUN conda create --name faiss_build -y
 RUN conda config --set solver libmamba
 RUN conda update -y -q conda
 RUN conda install -y -q python=3.11 cmake make swig numpy scipy pytest gflags
-RUN conda install -y -q -c conda-forge gxx_linux-64 sysroot_linux-64
+RUN conda install -y -q -c conda-forge gxx_linux-64 sysroot_linux-64 ncurses
 RUN conda install -y -q mkl=2023 mkl-devel=2023
 RUN conda init bash && . ~/.bashrc && conda activate
 
@@ -29,7 +29,7 @@ RUN echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.rad
 RUN apt update && apt install -y rocm-dev6.2.2 rocm-libs6.2.2
 
 # Install pyTorch
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.1
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
 
 COPY target.lst /opt/rocm/bin/
 ENV LD_LIBRARY_PATH=/opt/rocm/lib
@@ -43,28 +43,28 @@ RUN ln -s /root/miniconda3/x86_64-conda-linux-gnu/sysroot/usr/lib64/libpthread_n
 
 # FAISS
 WORKDIR /root
-RUN git clone https://github.com/ItsPitt/faiss.git
+RUN git clone https://github.com/facebookresearch/faiss.git
 WORKDIR /root/faiss
 RUN cmake -B build \
+    -DBUILD_TESTING=ON \
+    -DBUILD_SHARED_LIBS=ON \
     -DFAISS_ENABLE_GPU=ON \
     -DFAISS_ENABLE_ROCM=ON \
-    -DBUILD_TESTING=ON \
     -DFAISS_ENABLE_C_API=ON \
     -DFAISS_ENABLE_PYTHON=ON \
     -DCMAKE_PREFIX_PATH=/opt/rocm \
+    -DPYTHON_EXECUTABLE=/root/miniconda3/envs/faiss_build/bin/python \
+    -DBLA_VENDOR=Intel10_64_dyn \
     #-DCMAKE_BUILD_TYPE=Release \
     #-DCMAKE_BUILD_TYPE=RelWithDebInfo \
     .
-RUN make -C build -j faiss
+RUN make -k -C build -j$(nproc)
 
-# make the python wrapper
-RUN make -C build -j swigfaiss
-
-RUN make -C build -j install
-#RUN make -C build test
-
+# Tests
 RUN (cd build/faiss/python && python3 setup.py build)
 RUN cp tests/common_faiss_tests.py faiss/gpu-rocm/test/
+#RUN make -C build -j install
+#RUN make -C build test
 #RUN PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest tests/test_*.py
 #RUN PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest tests/torch_test_*.py
 #RUN PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest faiss/gpu-rocm/test/test_*.py
