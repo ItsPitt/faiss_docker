@@ -64,7 +64,6 @@ RUN cmake -B build \
     #-DCMAKE_BUILD_TYPE=RelWithDebInfo \
     .
 RUN make -k -C build -j$(nproc)
-#RUN make -C build test
 
 # Tests
 RUN (cd build/faiss/python && python3 setup.py build)
