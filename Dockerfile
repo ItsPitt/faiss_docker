@@ -5,14 +5,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 #Install packages
 RUN apt upgrade -y
-RUN apt update && apt install -y sudo wget gnupg2 git gcc gfortran libboost-dev bzip2 openmpi-bin flex build-essential bison libboost-all-dev vim libsqlite3-dev numactl sqlite3 gdb libgtest-dev libgflags-dev libssl-dev swig python3
+RUN apt update && apt install -y sudo wget gnupg2 git gcc gfortran libboost-dev bzip2 openmpi-bin flex build-essential bison libboost-all-dev vim libsqlite3-dev numactl sqlite3 gdb libgtest-dev libgflags-dev libssl-dev swig python3-dbg
 
 
 #ROCm 6.2.0
 RUN mkdir --parents --mode=0755 /etc/apt/keyrings
 RUN wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
-RUN echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.2.2 jammy main' | sudo tee /etc/apt/sources.list.d/rocm.list
-RUN apt update && apt install -y rocm-dev6.2.2 rocm-libs6.2.2
+RUN echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.3.1 jammy main' | sudo tee /etc/apt/sources.list.d/rocm.list
+RUN apt update && apt install -y rocm-dev6.3.1 rocm-libs6.3.1
 
 RUN pip install pytest scipy numpy==1.26.4
 
@@ -77,11 +77,13 @@ RUN cp tests/common_faiss_tests.py faiss/gpu-rocm/test/
 # get rpd
 RUN apt install -y libfmt-dev
 WORKDIR /root
-RUN git clone https://github.com/ROCmSoftwarePlatform/rocmProfileData
-WORKDIR rocmProfileData
-RUN make
-RUN make install
+RUN git clone https://github.com/iotamudelta/rocmProfileData_pub
+WORKDIR rocmProfileData_pub
+RUN git checkout stackframes_fixme
+RUN git submodule update --init --recursive
+#RUN make
+#RUN make install
 
 #Enable if running on a system with an igpu
-#ENV HIP_VISIBLE_DEVICES=0
+ENV HIP_VISIBLE_DEVICES=0
 WORKDIR /root/faiss
