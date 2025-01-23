@@ -14,7 +14,7 @@ RUN wget https://repo.radeon.com/rocm/rocm.gpg.key -O - | gpg --dearmor | sudo t
 RUN echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.3.1 jammy main' | sudo tee /etc/apt/sources.list.d/rocm.list
 RUN apt update && apt install -y rocm-dev6.3.1 rocm-libs6.3.1
 
-RUN pip install pytest scipy numpy==1.26.4
+RUN pip install pytest scipy numpy==1.26.4 h5py
 
 # Install pyTorch
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
@@ -75,15 +75,27 @@ RUN cp tests/common_faiss_tests.py faiss/gpu-rocm/test/
 #RUN PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest -v faiss/gpu-rocm/test/torch_test_contrib_gpu.py
 
 # get rpd
+RUN apt update && apt install -y curl libunwind-dev
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH=/root/.cargo/bin:$PATH
 RUN apt install -y libfmt-dev
 WORKDIR /root
 RUN git clone https://github.com/iotamudelta/rocmProfileData_pub
 WORKDIR rocmProfileData_pub
-RUN git checkout stackframes_fixme
+RUN git checkout chickensnake
 RUN git submodule update --init --recursive
 #RUN make
 #RUN make install
 
 #Enable if running on a system with an igpu
 ENV HIP_VISIBLE_DEVICES=0
-WORKDIR /root/faiss
+WORKDIR /root
+
+#Faiss benchmarking
+RUN git clone https://github.com/ItsPitt/faiss_benchmark.git
+RUN git checkout clip768_support
+COPY faiss_benchmark /root/faiss_benchmark
+WORKDIR /root/faiss_benchmark/search
+#RUN ln -s /dockerx/faiss_benchmark/clip data
+#PYTHONPATH="$(ls -d /root/faiss/build/faiss/python/build/lib*/)" python3 bench_gpu_clip10m.py
+
